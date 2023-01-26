@@ -3,7 +3,7 @@ pub mod instructions;
 
 use std::cell::RefCell;
 
-use self::{bus::Bus, instructions::{Instruction}};
+use self::{bus::Bus, instructions::Instruction};
 
 pub enum Flag {
     Carry,
@@ -31,10 +31,40 @@ pub enum AddrMode {
     Relative,
 }
 
+use AddrMode::*;
+use Instruction::*;
+
 pub struct InstructionSummary {
     addr_mode: AddrMode,
     instruction: Instruction,
     cycles: u8,
+}
+
+impl InstructionSummary {
+    pub fn new(addr_mode: AddrMode, instruction: Instruction, cycles: u8) -> Self {
+        Self {
+            addr_mode,
+            cycles,
+            instruction,
+        }
+    }
+}
+
+impl From<u8> for InstructionSummary {
+    fn from(opcode: u8) -> Self {
+        match opcode {
+            0x00 => Self::new(Implied, BRK_ForceBreak, 7),
+            0x01 => Self::new(IndirectOffsetX, ORA_ORMemoryWithAcc, 6),
+            0x05 => Self::new(ZeroPage, ORA_ORMemoryWithAcc, 3),
+            0x06 => Self::new(ZeroPage, ASL_ShiftLeftOneBit, 5),
+            0x08 => Self::new(Implied, PHP_PushProcessorStatusOnStack, 3),
+            0x09 => Self::new(Immediate, ORA_ORMemoryWithAcc, 2),
+            0x0A => Self::new(Implied, ASL_ShiftLeftOneBit, 2),
+            0x0D => Self::new(Absolute, ORA_ORMemoryWithAcc, 4),
+            0x0E => Self::new(Absolute, ASL_ShiftLeftOneBit, 6),
+            _ => Self::new(Implied, InvalidInstruction, 2),
+        }
+    }
 }
 
 pub struct Mos6502 {
@@ -78,7 +108,7 @@ impl Mos6502 {
                 cycles,
                 addr_mode,
                 instruction,
-            } = self.lookup_opcode(self.opcode);
+            } = InstructionSummary::from(self.opcode);
 
             self.pc += 1;
             self.cycles = cycles;
@@ -90,17 +120,6 @@ impl Mos6502 {
         }
 
         self.cycles -= 1;
-    }
-
-    fn lookup_opcode(&self, opcode: u8) -> InstructionSummary {
-        let instruction = match opcode {
-            _ => InstructionSummary {
-                addr_mode: AddrMode::Immediate,
-                instruction: Instruction::NOP_NoOperation,
-                cycles: 1,
-            },
-        };
-        instruction
     }
 
     fn handle_addr_mode(&mut self, addr_mode: AddrMode) -> u8 {
