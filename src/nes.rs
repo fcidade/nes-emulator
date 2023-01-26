@@ -1,9 +1,11 @@
+pub mod addr_modes;
 pub mod bus;
 pub mod instructions;
+pub mod instruction_summary;
 
 use std::cell::RefCell;
 
-use self::{bus::Bus, instructions::Instruction};
+use self::{addr_modes::*, bus::Bus, instruction_summary::InstructionSummary};
 
 pub enum Flag {
     Carry,
@@ -14,57 +16,6 @@ pub enum Flag {
     Unused,
     Overflow,
     Negative,
-}
-
-pub enum AddrMode {
-    Implied,
-    Immediate,
-    ZeroPage,
-    ZeroPageOffsetX,
-    ZeroPageOffsetY,
-    Absolute,
-    AbsoluteOffsetX,
-    AbsoluteOffsetY,
-    Indirect,
-    IndirectOffsetX,
-    IndirectOffsetY,
-    Relative,
-}
-
-use AddrMode::*;
-use Instruction::*;
-
-pub struct InstructionSummary {
-    addr_mode: AddrMode,
-    instruction: Instruction,
-    cycles: u8,
-}
-
-impl InstructionSummary {
-    pub fn new(addr_mode: AddrMode, instruction: Instruction, cycles: u8) -> Self {
-        Self {
-            addr_mode,
-            cycles,
-            instruction,
-        }
-    }
-}
-
-impl From<u8> for InstructionSummary {
-    fn from(opcode: u8) -> Self {
-        match opcode {
-            0x00 => Self::new(Implied, BRK_ForceBreak, 7),
-            0x01 => Self::new(IndirectOffsetX, ORA_ORMemoryWithAcc, 6),
-            0x05 => Self::new(ZeroPage, ORA_ORMemoryWithAcc, 3),
-            0x06 => Self::new(ZeroPage, ASL_ShiftLeftOneBit, 5),
-            0x08 => Self::new(Implied, PHP_PushProcessorStatusOnStack, 3),
-            0x09 => Self::new(Immediate, ORA_ORMemoryWithAcc, 2),
-            0x0A => Self::new(Implied, ASL_ShiftLeftOneBit, 2),
-            0x0D => Self::new(Absolute, ORA_ORMemoryWithAcc, 4),
-            0x0E => Self::new(Absolute, ASL_ShiftLeftOneBit, 6),
-            _ => Self::new(Implied, InvalidInstruction, 2),
-        }
-    }
 }
 
 pub struct Mos6502 {
@@ -104,118 +55,18 @@ impl Mos6502 {
         if self.cycles == 0 {
             self.opcode = self.read_byte(self.pc);
 
-            let InstructionSummary {
-                cycles,
-                addr_mode,
-                instruction,
-            } = InstructionSummary::from(self.opcode);
+            let instruction = InstructionSummary::from(self.opcode);
 
             self.pc += 1;
-            self.cycles = cycles;
+            self.cycles = instruction.cycles;
 
-            let addr_mode_additional_cycles = self.handle_addr_mode(addr_mode);
-            let instruction_additional_cycles = self.handle_instruction(instruction);
+            let addr_mode_additional_cycles = self.handle_addr_mode(instruction.addr_mode);
+            let instruction_additional_cycles = self.handle_instruction(instruction.instruction);
 
             self.cycles += addr_mode_additional_cycles & instruction_additional_cycles;
         }
 
         self.cycles -= 1;
-    }
-
-    fn handle_addr_mode(&mut self, addr_mode: AddrMode) -> u8 {
-        match addr_mode {
-            AddrMode::Implied => {
-                self.fetched = self.a;
-            }
-            AddrMode::Immediate => {
-                self.addr_abs = self.pc;
-                self.pc += 1;
-            }
-            AddrMode::ZeroPage => {
-                self.addr_abs = self.read_byte(self.pc) as u16;
-                self.pc += 1;
-                self.addr_abs &= 0x00FF;
-            }
-            AddrMode::ZeroPageOffsetX => {
-                self.addr_abs = self.read_byte(self.pc + self.x as u16) as u16;
-                self.pc += 1;
-                self.addr_abs &= 0x00FF;
-            }
-            AddrMode::ZeroPageOffsetY => {
-                self.addr_abs = self.read_byte(self.pc + self.y as u16) as u16;
-                self.pc += 1;
-                self.addr_abs &= 0x00FF;
-            }
-            AddrMode::Absolute => {
-                let addr = self.read_word(self.pc);
-                self.pc += 2;
-
-                self.addr_abs = addr;
-            }
-            AddrMode::AbsoluteOffsetX => {
-                let (addr, hi, _) = self.read_word_and_bytes(self.pc);
-                self.pc += 2;
-
-                self.addr_abs = addr;
-                self.addr_abs += self.x as u16;
-
-                if self.addr_abs & 0xFF00 != ((hi as u16) << 8) {
-                    return 1;
-                }
-            }
-            AddrMode::AbsoluteOffsetY => {
-                let (addr, hi, _) = self.read_word_and_bytes(self.pc);
-                self.pc += 2;
-
-                self.addr_abs = addr;
-                self.addr_abs += self.y as u16;
-
-                if self.addr_abs & 0xFF00 != ((hi as u16) << 8) {
-                    return 1;
-                }
-            }
-            AddrMode::Indirect => {
-                let (memory_pointer, _, lo) = self.read_word_and_bytes(self.pc);
-                self.pc += 2;
-
-                let low_byte = if lo == 0x00FF {
-                    // Simulate page boundary hardware bug
-                    self.read_byte(memory_pointer & 0xFF00) as u16
-                } else {
-                    // Behave normally
-                    self.read_byte(memory_pointer + 1) as u16
-                };
-
-                let high_byte = self.read_byte(memory_pointer) as u16;
-                self.addr_abs = (low_byte << 8) | high_byte;
-            }
-            AddrMode::IndirectOffsetX => {
-                let supplied_address = self.read_byte(self.pc);
-                self.pc += 1;
-
-                self.addr_abs = self.read_word(supplied_address as u16 + self.x as u16);
-            }
-            AddrMode::IndirectOffsetY => {
-                let supplied_address = self.read_byte(self.pc);
-                self.pc += 1;
-
-                let (addr, hi, _) = self.read_word_and_bytes(supplied_address as u16);
-                self.addr_abs = addr;
-                self.addr_abs += self.y as u16;
-
-                if self.addr_abs & 0xFF00 != ((hi as u16) << 8) {
-                    return 1;
-                }
-            }
-            AddrMode::Relative => {
-                self.addr_rel = self.read_byte(self.pc) as u16;
-                self.pc += 1;
-                if self.addr_rel & 0b10000000 != 0 {
-                    self.addr_rel |= 0xFF00;
-                }
-            }
-        }
-        return 0;
     }
 
     fn read_word_and_bytes(&mut self, addr: u16) -> (u16, u8, u8) {
@@ -237,7 +88,7 @@ impl Mos6502 {
     }
 
     fn fetch(&mut self) -> u8 {
-        match self.lookup_opcode(self.opcode).addr_mode {
+        match InstructionSummary::from(self.opcode).addr_mode {
             AddrMode::Implied => {}
             _ => {
                 self.fetched = self.read_byte(self.addr_abs);
