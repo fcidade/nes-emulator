@@ -10,3 +10,7 @@ https://emudev.de/nes-emulator/opcodes-and-addressing-modes-the-6502/
 Todo:
 - [ ] Debug text
 - [ ] Optmize text texture creation (maybe generate a texture for each character and reuse, instead of a texture for each text)
+
+---
+Perfect Doc:
+https://www.middle-engine.com/blog/posts/2020/06/23/programming-the-nes-the-6502-in-detail

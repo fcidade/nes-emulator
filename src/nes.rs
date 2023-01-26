@@ -1,4 +1,20 @@
+pub mod bus;
+pub mod instructions;
+
 use std::cell::RefCell;
+
+use self::{bus::Bus, instructions::{Instruction}};
+
+pub enum Flag {
+    Carry,
+    Zero,
+    DisableInterrupts,
+    DecimalMode,
+    Break,
+    Unused,
+    Overflow,
+    Negative,
+}
 
 pub enum AddrMode {
     Implied,
@@ -14,9 +30,6 @@ pub enum AddrMode {
     IndirectOffsetY,
     Relative,
 }
-pub enum Instruction {
-    NOP,
-}
 
 pub struct InstructionSummary {
     addr_mode: AddrMode,
@@ -26,6 +39,7 @@ pub struct InstructionSummary {
 
 pub struct Mos6502 {
     pub pc: u16,
+    pub status_flags: u8,
     pub stack_ptr: u16,
     pub a: u8,
     pub x: u8,
@@ -35,6 +49,7 @@ pub struct Mos6502 {
     pub fetched: u8,
     pub addr_abs: u16,
     pub addr_rel: u16,
+    pub opcode: u8,
 }
 
 impl Mos6502 {
@@ -42,6 +57,7 @@ impl Mos6502 {
         Self {
             pc: 0,
             stack_ptr: 0,
+            status_flags: 0,
             a: 0,
             x: 0,
             y: 0,
@@ -50,16 +66,19 @@ impl Mos6502 {
             fetched: 0,
             addr_abs: 0,
             addr_rel: 0,
+            opcode: 0,
         }
     }
 
     pub fn clock(&mut self) {
         if self.cycles == 0 {
+            self.opcode = self.read_byte(self.pc);
+
             let InstructionSummary {
                 cycles,
                 addr_mode,
                 instruction,
-            } = self.match_instruction();
+            } = self.lookup_opcode(self.opcode);
 
             self.pc += 1;
             self.cycles = cycles;
@@ -73,15 +92,15 @@ impl Mos6502 {
         self.cycles -= 1;
     }
 
-    fn match_instruction(&self) -> InstructionSummary {
-        let opcode = self.read_byte(self.pc);
-        match opcode {
+    fn lookup_opcode(&self, opcode: u8) -> InstructionSummary {
+        let instruction = match opcode {
             _ => InstructionSummary {
                 addr_mode: AddrMode::Immediate,
-                instruction: Instruction::NOP,
+                instruction: Instruction::NOP_NoOperation,
                 cycles: 1,
             },
-        }
+        };
+        instruction
     }
 
     fn handle_addr_mode(&mut self, addr_mode: AddrMode) -> u8 {
@@ -181,8 +200,8 @@ impl Mos6502 {
     }
 
     fn read_word_and_bytes(&mut self, addr: u16) -> (u16, u8, u8) {
-        let low_byte = self.read_byte(self.pc);
-        let high_byte = self.read_byte(self.pc + 1);
+        let low_byte = self.read_byte(addr);
+        let high_byte = self.read_byte(addr + 1);
         (
             ((high_byte as u16) << 8) | low_byte as u16,
             high_byte,
@@ -198,29 +217,41 @@ impl Mos6502 {
         self.bus.borrow().read(addr)
     }
 
-    fn handle_instruction(&mut self, instruction: Instruction) -> u8 {
-        match instruction {
-            Instruction::NOP => 0,
+    fn fetch(&mut self) -> u8 {
+        match self.lookup_opcode(self.opcode).addr_mode {
+            AddrMode::Implied => {}
+            _ => {
+                self.fetched = self.read_byte(self.addr_abs);
+            }
+        };
+        self.fetched
+    }
+
+    fn get_flag(&self, flag: Flag) -> bool {
+        let bit_mask = self.get_status_bit_mask(flag);
+        self.status_flags & bit_mask == 1
+    }
+
+    fn set_flag(&mut self, flag: Flag, val: bool) {
+        let bit_mask = self.get_status_bit_mask(flag);
+        let val = val as u8;
+        if val != 0 {
+            self.status_flags |= val << bit_mask;
+        } else {
+            self.status_flags &= !(val << bit_mask);
         }
     }
-}
 
-pub struct Bus {
-    memory: [u8; 64 * 1024],
-}
-
-impl Bus {
-    pub fn new() -> Self {
-        Self {
-            memory: [0; 64 * 1024],
+    fn get_status_bit_mask(&self, flag: Flag) -> u8 {
+        match flag {
+            Flag::Carry => 0b00000001,
+            Flag::Zero => 0b00000010,
+            Flag::DisableInterrupts => 0b00000100,
+            Flag::DecimalMode => 0b00001000,
+            Flag::Break => 0b00010000,
+            Flag::Unused => 0b00100000,
+            Flag::Overflow => 0b01000000,
+            Flag::Negative => 0b10000000,
         }
-    }
-
-    pub fn read(&self, addr: u16) -> u8 {
-        self.memory[addr as usize]
-    }
-
-    pub fn write(&mut self, addr: u16, value: u8) {
-        self.memory[addr as usize] = value;
     }
 }
