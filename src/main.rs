@@ -1,5 +1,5 @@
 mod nes;
-use nes::{Mos6502, bus::Bus};
+use nes::{bus::Bus, mos_6502::Mos6502};
 
 use std::{cell::RefCell, time::Duration};
 

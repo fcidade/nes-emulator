@@ -1,4 +1,3 @@
-use super::{Flag, Mos6502};
 
 #[allow(non_camel_case_types)]
 pub enum Instruction {
@@ -62,6 +61,8 @@ pub enum Instruction {
 }
 
 use Instruction::*;
+
+use super::mos_6502::{Mos6502, Flag};
 
 impl ToString for Instruction {
     fn to_string(&self) -> String {
@@ -205,6 +206,6 @@ impl Mos6502 {
             TYA_TransferYToAcc => {}
             InvalidInstruction => println!("Invalid instruction!"),
         }
-        0
+        return 0
     }
 }

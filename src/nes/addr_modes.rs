@@ -1,4 +1,3 @@
-use super::Mos6502;
 
 pub enum AddrMode {
     Implied,
@@ -16,6 +15,8 @@ pub enum AddrMode {
 }
 
 use AddrMode::*;
+
+use super::mos_6502::Mos6502;
 
 impl Mos6502 {
     pub fn handle_addr_mode(&mut self, addr_mode: AddrMode) -> u8 {

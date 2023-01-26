@@ -1,11 +1,8 @@
-pub mod addr_modes;
-pub mod bus;
-pub mod instructions;
-pub mod instruction_summary;
+
 
 use std::cell::RefCell;
 
-use self::{addr_modes::*, bus::Bus, instruction_summary::InstructionSummary};
+use super::{bus::Bus, instruction_summary::InstructionSummary, addr_modes::AddrMode};
 
 pub enum Flag {
     Carry,
@@ -69,7 +66,7 @@ impl Mos6502 {
         self.cycles -= 1;
     }
 
-    fn read_word_and_bytes(&mut self, addr: u16) -> (u16, u8, u8) {
+    pub fn read_word_and_bytes(&mut self, addr: u16) -> (u16, u8, u8) {
         let low_byte = self.read_byte(addr);
         let high_byte = self.read_byte(addr + 1);
         (
@@ -79,15 +76,15 @@ impl Mos6502 {
         )
     }
 
-    fn read_word(&mut self, addr: u16) -> u16 {
+    pub fn read_word(&mut self, addr: u16) -> u16 {
         self.read_word_and_bytes(addr).0
     }
 
-    fn read_byte(&self, addr: u16) -> u8 {
+    pub fn read_byte(&self, addr: u16) -> u8 {
         self.bus.borrow().read(addr)
     }
 
-    fn fetch(&mut self) -> u8 {
+    pub fn fetch(&mut self) -> u8 {
         match InstructionSummary::from(self.opcode).addr_mode {
             AddrMode::Implied => {}
             _ => {
@@ -97,12 +94,12 @@ impl Mos6502 {
         self.fetched
     }
 
-    fn get_flag(&self, flag: Flag) -> bool {
+    pub fn get_flag(&self, flag: Flag) -> bool {
         let bit_mask = self.get_status_bit_mask(flag);
         self.status_flags & bit_mask == 1
     }
 
-    fn set_flag(&mut self, flag: Flag, val: bool) {
+    pub fn set_flag(&mut self, flag: Flag, val: bool) {
         let bit_mask = self.get_status_bit_mask(flag);
         let val = val as u8;
         if val != 0 {
