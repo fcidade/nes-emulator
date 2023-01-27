@@ -1,6 +1,6 @@
 
 
-use std::cell::RefCell;
+use std::{rc::Rc, cell::RefCell};
 
 use super::{bus::Bus, instruction_summary::InstructionSummary, addr_modes::AddrMode};
 
@@ -22,7 +22,7 @@ pub struct Mos6502 {
     pub a: u8,
     pub x: u8,
     pub y: u8,
-    pub bus: RefCell<Bus>,
+    pub bus: Rc<RefCell<Bus>>,
     pub cycles: u8,
     pub fetched: u8,
     pub addr_abs: u16,
@@ -31,7 +31,7 @@ pub struct Mos6502 {
 }
 
 impl Mos6502 {
-    pub fn new(bus: RefCell<Bus>) -> Self {
+    pub fn new(bus: Rc<RefCell<Bus>>) -> Self {
         Self {
             pc: 0,
             stack_ptr: 0,
@@ -66,7 +66,7 @@ impl Mos6502 {
         self.cycles -= 1;
     }
 
-    pub fn read_word_and_bytes(&mut self, addr: u16) -> (u16, u8, u8) {
+    pub fn read_word_and_bytes(&self, addr: u16) -> (u16, u8, u8) {
         let low_byte = self.read_byte(addr);
         let high_byte = self.read_byte(addr + 1);
         (
@@ -81,7 +81,7 @@ impl Mos6502 {
     }
 
     pub fn read_byte(&self, addr: u16) -> u8 {
-        self.bus.borrow().read(addr)
+        self.bus.borrow_mut().read(addr)
     }
 
     pub fn fetch(&mut self) -> u8 {
