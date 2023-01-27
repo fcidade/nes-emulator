@@ -13,6 +13,10 @@ impl Bus {
         self.memory[addr as usize]
     }
 
+    pub fn read_bulk(&self, addr: u16, size: u16) -> Vec<u8> {
+        self.memory[(addr as usize)..((addr + size) as usize)].to_vec()
+    }
+
     pub fn write(&mut self, addr: u16, value: u8) {
         self.memory[addr as usize] = value;
     }

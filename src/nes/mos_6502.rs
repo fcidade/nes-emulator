@@ -84,6 +84,10 @@ impl Mos6502 {
         self.bus.borrow_mut().read(addr)
     }
 
+    pub fn write(&self, addr: u16, value: u8) {
+        self.bus.borrow_mut().write(addr, value);
+    }
+
     pub fn fetch(&mut self) -> u8 {
         match InstructionSummary::from(self.opcode).addr_mode {
             AddrMode::Implied => {}

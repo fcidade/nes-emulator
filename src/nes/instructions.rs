@@ -177,7 +177,10 @@ impl Mos6502 {
             INY_IncrementYByOne => {}
             JMP_JumpTo => {}
             JSR_JumpToSavingReturnAddr => {}
-            LDA_LoadAccWithMemory => {}
+            LDA_LoadAccWithMemory => {
+                self.fetch();
+                self.a = self.fetched;
+            }
             LDX_LoadXWithMemory => {}
             LDY_LoadYWithMemory => {}
             LSR_ShiftOneBitRight => {}
@@ -195,7 +198,10 @@ impl Mos6502 {
             SEC_SetCarryFlag => self.set_flag(Flag::Carry, true),
             SED_SetDecimalMode => self.set_flag(Flag::DecimalMode, true),
             SEI_SetInterruptDisableStatus => self.set_flag(Flag::DisableInterrupts, true),
-            STA_StoreAccInMemory => {}
+            STA_StoreAccInMemory => {
+                self.fetch();
+                self.write(self.addr_abs, self.a);
+            }
             STX_StoreXInMemory => {}
             STY_StoreYInMemory => {}
             TAX_TransferAccToX => {}

@@ -17,8 +17,8 @@ use sdl2::{
 
 extern crate sdl2;
 
-static SCREEN_WIDTH: u32 = 600;
-static SCREEN_HEIGHT: u32 = 400;
+static SCREEN_WIDTH: u32 = 640;
+static SCREEN_HEIGHT: u32 = 480;
 
 macro_rules! rect {
     ($x:expr, $y:expr, $w:expr, $h:expr) => {
@@ -175,6 +175,18 @@ N: NMI
 
         let debug_text = format!("Program:\n-> {}", disassembled_program,);
         engine.draw_text(debug_text.trim().into(), SCREEN_WIDTH as isize / 2, 0)?;
+
+        let debug_text = self
+            .cpu
+            .bus
+            .borrow()
+            .read_bulk(0x0200, 100)
+            .iter()
+            .map(|x| format!("{:02X}", x))
+            .collect::<Vec<String>>()
+            .join(" ");
+        let debug_text = format!("Memory: (0x0200 -> 0x0300)\n{}", debug_text);
+        engine.draw_text(debug_text.trim().into(), 0, SCREEN_HEIGHT as isize / 2 + 30)?;
 
         Ok(())
     }
